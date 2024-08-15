@@ -315,12 +315,12 @@ function [img, HK, HKon]=get_img(buf,outfilename2)
               jjj=1;
               kkk=0;
               while jjj<=nS && kkk<n-2 % Last two slices are time
-                  aa=bitand(buf(iii+kkk),16256)/2^7;  %bin2dec('0011111110000000'   
-                  bb=bitand(buf(iii+kkk),127); %bin2dec('0000000001111111')
+                  aa=bitand(buf(iii+kkk),16256)/2^7;  %bin2dec('0011111110000000') - nShaded
+                  bb=bitand(buf(iii+kkk),127); %bin2dec('0000000001111111') - nClear
                   img(min(128,bb+1):min(aa+bb,128),iSlice+jjj)=1;
                   bBase=min(aa+bb,128);
                   kkk=kkk+1;
-                  while( bitand(buf(iii+kkk),16384)==0  && kkk<n-2) % bin2dec('1000000000000000')
+                  while( bitand(buf(iii+kkk),16384)==0  && kkk<n-2) % bin2dec('1000000000000000') - start slice flag
                       aa=bitand(buf(iii+kkk),16256)/2^7;
                       bb=bitand(buf(iii+kkk),127);
                       img(min(128,bBase+bb+1):min(bBase+aa+bb,128),iSlice+jjj)=1;
@@ -399,7 +399,7 @@ function [img, HK, HKon]=get_img(buf,outfilename2)
             
             iii = iii + 53;
         
-        elseif 19787==buf(iii) % 'MK' is ascii (Mask data block)
+        elseif 19787==buf(iii) % 'MK' in ascii (Mask data block)
             timeWord = buf(iii-1+2)*2^16+buf(iii-1+3);
             MaskBits = [buf(iii-1+4:iii-1+19)]';
             timeStart = buf(iii-1+20)*2^16+buf(iii-1+21);

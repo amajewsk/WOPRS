@@ -85,17 +85,17 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
     while data(j,1) ~= -1 && j < size(data,1)
         % Loop over every particle in the buffer
         if (isequal(data(j,:), boundary) && ( (isequal(data(j+1,2), boundarytime) ) ) )
-           if start ==0
-                   start = 1;
-           end
-              if probetype==1
-                   if start+1 > (j-1)  % Remove Corrupted Data
+            if start ==0
+                start = 1;
+            end
+                if probetype==1
+                    if start+1 > (j-1)  % Remove Corrupted Data
                         start = j + 2;
                         j = j + 1;
                         continue;
-                   end
-               else
-                   if start > (j-1)  % Remove Corrupted Data
+                    end
+                else
+                    if start > (j-1)  % Remove Corrupted Data
                         if probetype==3
                             start = j + 3;
                         else
@@ -103,13 +103,13 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                         end
                         j = j + 1;
                         continue;
-                   end
-               end 
+                    end
+                end 
                 
                 if(probetype == 3)
-                   header_loc = j+2;
+                    header_loc = j+2;
                 else
-                   header_loc = j+1;
+                    header_loc = j+1;
                 end
                 w=w+1;
                 
@@ -252,7 +252,7 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                     % calculate the interarrival time by subtracting the
                     % previous particle time (in microseconds) from the
                     % current particle time (in microseconds).
-                   switch channel(kk)
+                    switch channel(kk)
                         case 'H'
                             if last_H == -1
                                 images.int_arrival(kk) = NaN;
@@ -268,7 +268,7 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                                 images.int_arrival(kk) = part_micro(kk) - last_V;
                             end
                             last_V = part_micro(kk);
-                   end
+                    end
                             
         
                     % Fix interarrival times if the time variable gets too
@@ -277,44 +277,42 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                         images.int_arrival(kk) = images.int_arrival(kk) +  (2^32 - 1);
                     end
         
-                    %**************************************
+                %**************************************
                 elseif probetype==3 %CIP
-                     %slice[127:120] 8-bit slice count
-                     %slice[119:115] 5-bit hours
-                     %slice[114:109] 6-bit minutes
-                     %slice[108:103] 6-bit seconds
-                     %slice[102:93] 10-bit milliseconds
-                     %slice[92:83] 10-bit microseconds
-                     %slice[82:80] 3-eights of microseconds (125 ns)
-                     %slice[79:64] 16-bit particle count
-                     %slice[63:56] 8-bit true airspeed (in meters per second)
-                     %slice[55:0] 56-bit 0's
+                    %slice[127:120] 8-bit slice count
+                    %slice[119:115] 5-bit hours
+                    %slice[114:109] 6-bit minutes
+                    %slice[108:103] 6-bit seconds
+                    %slice[102:93] 10-bit milliseconds
+                    %slice[92:83] 10-bit microseconds
+                    %slice[82:80] 3-eights of microseconds (125 ns)
+                    %slice[79:64] 16-bit particle count
+                    %slice[63:56] 8-bit true airspeed (in meters per second)
+                    %slice[55:0] 56-bit 0's
                       
-                     part_hour(kk) = data(header_loc,60)*8+data(header_loc,59)*2+bitshift(data(header_loc,58),-1);
-                     if mod((part_hour(kk) - handles.hour),24) >= 11
+                    part_hour(kk) = data(header_loc,60)*8+data(header_loc,59)*2+bitshift(data(header_loc,58),-1);
+                    if mod((part_hour(kk) - handles.hour),24) >= 11
                         part_hour(kk) = mod(part_hour(kk)+12,12);
-                     end
-                     part_min(kk) = bitget(data(header_loc,58),1)*32+data(header_loc,57)*8+data(header_loc,56)*2+bitshift(data(header_loc,55),-1);
-                     part_sec(kk) = bitget(data(header_loc,55),1)*32+data(header_loc,54)*8+data(header_loc,53)*2+bitshift(data(header_loc,52),-1);
-                     part_mil(kk) = bitget(data(header_loc,52),1)*512+data(header_loc,51)*128+data(header_loc,50)*32+data(header_loc,49)*8+data(header_loc,48)*2+bitshift(data(header_loc,47),-1);
-                     part_micro(kk) = bitget(data(header_loc,47),1)*512+data(header_loc,46)*128+data(header_loc,45)*32+data(header_loc,44)*8+data(header_loc,43)*2+bitshift(data(header_loc,42),-1);
-                     part_micro(kk) = part_micro(kk) + 3/8*(bitget(data(header_loc,42),1)*4+data(header_loc,41));
+                    end
+                    part_min(kk) = bitget(data(header_loc,58),1)*32+data(header_loc,57)*8+data(header_loc,56)*2+bitshift(data(header_loc,55),-1);
+                    part_sec(kk) = bitget(data(header_loc,55),1)*32+data(header_loc,54)*8+data(header_loc,53)*2+bitshift(data(header_loc,52),-1);
+                    part_mil(kk) = bitget(data(header_loc,52),1)*512+data(header_loc,51)*128+data(header_loc,50)*32+data(header_loc,49)*8+data(header_loc,48)*2+bitshift(data(header_loc,47),-1);
+                    part_micro(kk) = bitget(data(header_loc,47),1)*512+data(header_loc,46)*128+data(header_loc,45)*32+data(header_loc,44)*8+data(header_loc,43)*2+bitshift(data(header_loc,42),-1);
+                    part_micro(kk) = part_micro(kk) + 3/8*(bitget(data(header_loc,42),1)*4+data(header_loc,41));
                      
-                     
-                     fours = power(4,0:7);
-                     fours = power(4,0:3);
-                     part_tas = sum(data(header_loc, 29:32).*fours);
-                     time_in_seconds(kk) = part_hour(kk) * 3600 + part_min(kk) * 60 + part_sec(kk) + part_mil(kk)/1000 + part_micro(kk)/1e6;
-                     time_in_microsecs(kk) = time_in_seconds(kk) * 10^6;
-                     
+                    fours = power(4,0:7);
+                    fours = power(4,0:3);
+                    part_tas = sum(data(header_loc, 29:32).*fours);
+                    time_in_seconds(kk) = part_hour(kk) * 3600 + part_min(kk) * 60 + part_sec(kk) + part_mil(kk)/1000 + part_micro(kk)/1e6;
+                    time_in_microsecs(kk) = time_in_seconds(kk) * 10^6;
 
-                     if w > 0
+                    if w > 0
                         images.int_arrival(kk) = time_in_microsecs(kk) - last_inter_arrival;
-                     else
+                    else
                         images.int_arrival(kk) =  NaN;
-                     end
+                    end
                      
-                     last_inter_arrival = time_in_microsecs(kk); % Save the particle time so that we can use it to calculate the next particle's interarrival time
+                    last_inter_arrival = time_in_microsecs(kk); % Save the particle time so that we can use it to calculate the next particle's interarrival time
                      
                     % Fix interarrival times if the time variable gets too
                     % large for MATLAB, and the times rollover.
@@ -326,8 +324,6 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                 rec_time(kk)=double(handles.hour)*10000+double(handles.minute)*100+double(handles.second);
                 rec_date(kk)=double(handles.year)*10000+double(handles.month)*100+double(handles.day);
                 rec_millisec(kk)=handles.millisec;
-                
-
                 
                 %% Now we have to go through the three levels of image
                 %% analysis. Images will continue to levels 2 and 3 only if
@@ -347,9 +343,9 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                 roundness(kk) = NaN;
                 circularity(kk) = NaN;
                 
-               % Send image to level 1 to determine if the image is
-               % to be rejected or not.
-               [artifact_status(kk),slicecount(kk),in_status(kk)]=Image_Analysis_Artifact_Reject_Level_1(c);
+                % Send image to level 1 to determine if the image is
+                % to be rejected or not.
+                [artifact_status(kk),slicecount(kk),in_status(kk)]=Image_Analysis_Artifact_Reject_Level_1(c);
                    
                 % Pass to levels 2 and 3 if image has not been identified as an
                 % artifact. We calculate some useful parameters in level 2,
@@ -389,9 +385,9 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
         netcdf.putVar ( f, varid.Time_in_seconds, wstart, w-wstart+1, time_in_seconds(:) );
         netcdf.putVar ( f, varid.channel, wstart, w-wstart+1, channel);
         netcdf.putVar ( f, varid.position, [0 wstart], [2 w-wstart+1], images.position' );
-         netcdf.putVar ( f, varid.particle_time, wstart, w-wstart+1, part_hour(:)*10000+part_min(:)*100+part_sec(:) );
-         netcdf.putVar ( f, varid.particle_millisec, wstart, w-wstart+1, part_mil(:) );
-         netcdf.putVar ( f, varid.particle_microsec, wstart, w-wstart+1, part_micro(:) );
+        netcdf.putVar ( f, varid.particle_time, wstart, w-wstart+1, part_hour(:)*10000+part_min(:)*100+part_sec(:) );
+        netcdf.putVar ( f, varid.particle_millisec, wstart, w-wstart+1, part_mil(:) );
+        netcdf.putVar ( f, varid.particle_microsec, wstart, w-wstart+1, part_micro(:) );
         netcdf.putVar ( f, varid.parent_rec_num, wstart, w-wstart+1, parent_rec_num );
         netcdf.putVar ( f, varid.inter_arrival, wstart, w-wstart+1, images.int_arrival );
         netcdf.putVar ( f, varid.artifact_status, wstart, w-wstart+1, artifact_status);        
