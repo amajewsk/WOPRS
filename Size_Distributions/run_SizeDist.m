@@ -47,7 +47,7 @@ end
 % Generate_SizeDist.
 switch probe
     case {'2DS','2ds'}
-
+        time_choice = 'Time';
         files = dir([PROC_directory,'PROC.*.2DS.cdf']);
         filenums = length(files);
         if filenums < 1
@@ -61,12 +61,18 @@ switch probe
         % be added, without affecting the size distribution code.
         PROC_file = netcdf.open([PROC_directory,files(1).name],'nowrite');
         num_rejects = netcdf.getAtt(PROC_file, netcdf.inqVarID(PROC_file,'artifact_status'),'Number of artifact statuses');
+        time_desc = netcdf.getAtt(PROC_file, netcdf.inqVarID(PROC_file,'Time_in_seconds'),'long_name');
+        netcdf.close(PROC_file);
+        if contains(time_desc,'reconstructed')
+            time_choice = 'Time_in_seconds';
+        end
         IA_threshold = 1e-5;
         inFile = [PROC_directory,files(1).name];
         proc_pos = find(inFile == 'P',1,'last');
         outFile = [inFile(1:proc_pos-1),'SD.',date,'_',upper(in_status(1)),'.2DS.cdf']
-        Generate_SizeDist(files,outFile,tas,floor(timehhmmss),'2DS',num_rejects,IA_threshold);    
+        Generate_SizeDist(files,outFile,tas,floor(timehhmmss),'2DS',num_rejects,IA_threshold,time_choice);    
     case {'HVPS','hvps'}
+        time_choice = 'Time';
         files = dir([PROC_directory,'PROC.*.HVPS.cdf']);
         filenums = length(files);
         if filenums < 1
@@ -80,6 +86,11 @@ switch probe
         % be added, without affecting the size distribution code.
         PROC_file = netcdf.open([PROC_directory,files(1).name],'nowrite');
         num_rejects = netcdf.getAtt(PROC_file, netcdf.inqVarID(PROC_file,'artifact_status'),'Number of artifact statuses');
+        time_desc = netcdf.getAtt(PROC_file, netcdf.inqVarID(PROC_file,'Time_in_seconds'),'long_name');
+        netcdf.close(PROC_file);
+        if contains(time_desc,'reconstructed')
+            time_choice = 'Time_in_seconds';
+        end
         IA_threshold = 1e-4;
         inFile = [PROC_directory,files(1).name];
         proc_pos = find(inFile == 'P');
@@ -89,7 +100,7 @@ switch probe
             proc_pos = proc_pos(end);
         end
         outFile = [inFile(1:proc_pos-1),'SD.',date,'_',upper(in_status(1)),'.HVPS.cdf']
-        Generate_SizeDist(files,outFile,tas,floor(timehhmmss),'HVPS',num_rejects,IA_threshold);
+        Generate_SizeDist(files,outFile,tas,floor(timehhmmss),'HVPS',num_rejects,IA_threshold,time_choice);
         
     case {'CIPG','cip','cipg','CIP'}
 

@@ -1,4 +1,4 @@
-function Generate_SizeDist(PROC_files,outfile,tas,timehhmmss,probename,num_rejects,IA_threshold)
+function Generate_SizeDist(PROC_files,outfile,tas,timehhmmss,probename,num_rejects,IA_threshold,time_choice)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This function is called by run_SizeDist to generate NetCDF files
 % containing size distribution data. 
@@ -19,10 +19,11 @@ arguments
     PROC_files struct
     outfile (1,:) string
     tas (1,:) double
-    timehhmmss (1,:) double
+    timehhmmss (1,:) double %the TAS time vector
     probename (1,:) char
     num_rejects (1,1) {mustBeNumeric,mustBeReal}
     IA_threshold (1,1) {mustBeNumeric,mustBeReal}=10; %Default interarrival threshold (clock cycles) used if no changes are made to run_SizeDist and Generate_SizeDist is called w/o arg
+    time_choice (1,:) char='Time';%Default time choice
 end 
 %% Begin generating the size distribution
 disp(['Generating Size Distribution for the ',probename]);
@@ -59,8 +60,8 @@ for x = 1:length(PROC_files)
     % Define input file and initialize time variable
     disp(['Reading in file: ',PROC_files(x).folder,'/',PROC_files(x).name])
     infile = netcdf.open([PROC_files(x).folder,'/',PROC_files(x).name],'nowrite');
-    times = netcdf.getVar(infile,netcdf.inqVarID(infile,'Time'));
-
+    times = netcdf.getVar(infile,netcdf.inqVarID(infile,time_choice));
+    
     % Read in other variables
     diameter = netcdf.getVar(infile,netcdf.inqVarID(infile,'diameter'));
     artifacts = netcdf.getVar(infile,netcdf.inqVarID(infile,'artifact_status'));
@@ -89,8 +90,12 @@ for x = 1:length(PROC_files)
     %% Create the output file
     [f,varid]=define_outfile_SizeDist(probename,num_rejects,timehhmmss,outfile,num_round_bins,num_diam_bins,In_status,num_ar_bins,num_circ_bins,IA_threshold);
     
+    if times(1) == 0
+        ind0 = find(times ~= 0);
+        times = times(ind0(1):end);
+    end
     % Times shared by aircraft and probe data
-    times_both = times(ismember(times,timehhmmss));
+    times_both = times(ismember(fix(times),timehhmmss));
     
     % Increment PROC if no matching times
     if isempty(times), continue, end
@@ -100,8 +105,8 @@ for x = 1:length(PROC_files)
 
     % Find the first and last time that is available in both the PROC and
     % aircraft files. We will loop over these times to create the SD file.
-    first_time_index = find(timehhmmss == first_PROC_time);
-    end_time_index = find(timehhmmss == last_PROC_time);
+    first_time_index = find(timehhmmss == fix(first_PROC_time));
+    end_time_index = find(timehhmmss == fix(last_PROC_time));
 
     %% Calculate sample area depending on whether we are considering center-in or only all-in images 
     
@@ -128,7 +133,7 @@ for x = 1:length(PROC_files)
         current_hhmmss = timehhmmss(i);
 
         % Find the indices of all the particles that correspond to this time
-        good_indices = find(times == current_hhmmss);
+        good_indices = find(fix(times) == current_hhmmss);
         
         % Set the counts to 0 at every time when there is both an aircraft
         % file and a PROC file. NaN's otherwise
@@ -248,7 +253,7 @@ netcdf.putVar ( f, varid.Accepted_counts, accepted_counts);
 netcdf.putVar ( f, varid.total_accepted_counts, total_accepted_counts);
 netcdf.putVar ( f, varid.bin_min, min_bin_diams);
 netcdf.putVar ( f, varid.bin_max, max_bin_diams);
-netcdf.putVar ( f, varid.bin_mid, mid_bin_diams);
+netcdf.putVar ( f, varid.bin_mid, mid_bin_diams*1d3);
 netcdf.putVar ( f, varid.roundness_counts, roundness_counts);
 netcdf.putVar ( f, varid.circularity_counts, circularity_counts);
 netcdf.putVar ( f, varid.aspect_ratio_counts, aspect_ratio_counts);

@@ -10,13 +10,15 @@ function [outfilename1]=OAP_to_NETCDF_SPEC(infilename,outfilename0,outfilename1,
 %% Last edited by: Kevin Shaffer 9/16/2021
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-global tas
-    
-% Open the input file in read-only ('r') mode for reading in little-endian ('l').
-fid=fopen(infilename,'r','l');
-    
-tas = 1; % Set tas to 1 before the first set of housekeeping data
-    
+    global tas
+        
+    % Open the input file in read-only ('r') mode for reading in little-endian ('l').
+    fid=fopen(infilename,'r','l');
+        
+    tas = 1; % Set tas to 1 before the first set of housekeeping data
+    img_last = NaN;
+    HK_last = NaN;
+
     %%  Create the housekeeping file
     f0 = netcdf.create(outfilename0, 'CLOBBER');
 
@@ -80,6 +82,7 @@ tas = 1; % Set tas to 1 before the first set of housekeeping data
     var55 = netcdf.defVar(f0,'spare3','double',dim0);
     var56 = netcdf.defVar(f0,'tas','float',dim0);
     var57 = netcdf.defVar(f0,'timing_word','double',dim0);
+    var58 = netcdf.defVar(f0,'prev_rec','float',dim0);
     netcdf.endDef(f0)
     
 
@@ -109,6 +112,8 @@ tas = 1; % Set tas to 1 before the first set of housekeeping data
     kk1=1;
     endfile = 0; 
     
+    
+
     disp('Processing...')
     
     %% Read in the information until we are at the end of the file
@@ -142,7 +147,7 @@ tas = 1; % Set tas to 1 before the first set of housekeeping data
         % Take data and send it to 'get_img' to be decompressed and read
         
         %[img, HK, HKon]=get_img(datan, hour*10000+minute*100+second+millisec/1000,outfilename);
-        [img, HK, HKon]=get_img(datan,outfilename2);
+        [img, HK, HKon, HK_last,img_last]=get_img(datan,outfilename2,HK_last,img_last);
         sizeimg= size(img);
         if sizeimg(2)>1700
             img=img(:,1:1700);
@@ -214,7 +219,8 @@ tas = 1; % Set tas to 1 before the first set of housekeeping data
             netcdf.putVar ( f0, var55, kk0-1, 1, HK.Spare3 );
             netcdf.putVar ( f0, var56, kk0-1, 1, HK.tas );
             netcdf.putVar ( f0, var57, kk0-1, 1, HK.time );
-            
+            netcdf.putVar ( f0, var58, kk0-1, 1, kk1);
+
             kk0=kk0+1;
         end
             
@@ -237,11 +243,9 @@ tas = 1; % Set tas to 1 before the first set of housekeeping data
             
             kk1=kk1+1;
             if mod(kk1,1000) == 0
-                 ['kk1=' num2str(kk1) ', ' datestr(now)]
+                ['kk1=' num2str(kk1) ', ' datestr(now)]
             end
         end
-        
-        
         
         % Read in the next byte and see if we are at the end of the file
         bb=fread(fid,1,'int8');
@@ -254,19 +258,18 @@ tas = 1; % Set tas to 1 before the first set of housekeeping data
     
     netcdf.close(f0);
     netcdf.close(f);      
-
-
-fclose(fid);
+    fclose(fid);
 end
 
 
-function [img, HK, HKon]=get_img(buf,outfilename2)
+function [img, HK, HKon,HK_last,img_last]=get_img(buf,outfilename2,HK_last,img_last)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 %% Decompress the data blocks
 %% Follow the SPEC manual 
-%% by Will Wu, 06/20/2013; edited by Kevin Shaffer 6/24/2019
+%% by Will Wu, 06/20/2013; edited by Kevin Shaffer 6/24/2019;
+%% Edited 08/28/2024 by Adam Majewski
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -280,68 +283,84 @@ function [img, HK, HKon]=get_img(buf,outfilename2)
     HK.x=0;
     while iii<=2048 
         if 12883==buf(iii) % '2S' in ascii (Particle Frame Format)
-              nH=bitand(buf(iii+1), 4095); %bin2dec('0000111111111111'));
-              bHTiming=bitand(buf(iii+1), 4096); %bin2dec('0001000000000000'))/2^13;
-              nV=bitand(buf(iii+2), 4095); %bin2dec('0000111111111111'));
-              bVTiming=bitand(buf(iii+2), 4096); %bin2dec('0001000000000000'))/2^13;
-              PC = buf(iii+3);
-              nS = buf(iii+4);
-              NHWord=buf(iii+1);
-              NVWord=buf(iii+2);
+            nH=bitand(buf(iii+1), 4095); %bin2dec('0000111111111111'));
+            bHTiming=bitand(buf(iii+1), 4096); %bin2dec('0001000000000000'))/2^13;
+            nV=bitand(buf(iii+2), 4095); %bin2dec('0000111111111111'));
+            bVTiming=bitand(buf(iii+2), 4096); %bin2dec('0001000000000000'))/2^13;
+            PC = buf(iii+3);
+            nS = buf(iii+4);
+            NHWord=buf(iii+1);
+            NVWord=buf(iii+2);
+            
+            if nH~=0
+                n = nH;
+                bTiming = bHTiming;
+                NWord = NHWord;
+                channel = 1;
+            elseif nV~=0
+                n = nV;
+                bTiming = bVTiming;
+                NWord = NVWord;
+                channel = 0;
+            else
+                disp('NH and NV ~= 0. This should not have happened')
+            end
               
-              if nH~=0
-                  n = nH;
-                  bTiming = bHTiming;
-                  NWord = NHWord;
-                  channel = 1;
-              elseif nV~=0
-                  n = nV;
-                  bTiming = bVTiming;
-                  NWord = NVWord;
-                  channel = 0;
-              else
-                  disp('NH and NV ~= 0. This should not have happened')
-              end
+            if nH~=0 && nV~=0
+                system(['echo ' num2str(nH)  ' ' num2str(nV) ' >> output.txt']);
+            end
               
-              if nH~=0 && nV~=0
-                  system(['echo ' num2str(nH)  ' ' num2str(nV) ' >> output.txt']);
-              end
+            iii=iii+5;
               
-              iii=iii+5;
-              
-              if bHTiming~=0 || bVTiming~=0     
-                  iii=iii+nH+nV;
-              else
-              jjj=1;
-              kkk=0;
-              while jjj<=nS && kkk<n-2 % Last two slices are time
-                  aa=bitand(buf(iii+kkk),16256)/2^7;  %bin2dec('0011111110000000') - nShaded
-                  bb=bitand(buf(iii+kkk),127); %bin2dec('0000000001111111') - nClear
-                  img(min(128,bb+1):min(aa+bb,128),iSlice+jjj)=1;
-                  bBase=min(aa+bb,128);
-                  kkk=kkk+1;
-                  while( bitand(buf(iii+kkk),16384)==0  && kkk<n-2) % bin2dec('1000000000000000') - start slice flag
-                      aa=bitand(buf(iii+kkk),16256)/2^7;
-                      bb=bitand(buf(iii+kkk),127);
-                      img(min(128,bBase+bb+1):min(bBase+aa+bb,128),iSlice+jjj)=1;
-                      bBase=min(bBase+aa+bb,128);
-                      kkk=kkk+1;
-                  end
-                  jjj=jjj+1;
-              end
-              iSlice=iSlice+nS+2;
-              img(:,iSlice-1)='10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010';
-              img(:,iSlice-1)=img(:,iSlice-1)-48;
-              img(:,iSlice)=1;
-              tParticle=buf(iii+n-2)*2^16+buf(iii+n-1);
-              img(:,iSlice)=dec2bin(tParticle,128)-48;
-              img(97:128,iSlice)=dec2bin(tParticle,32)-48;
-              img(49:64,iSlice)=dec2bin(NWord,16)-48;
-              img(65:80,iSlice)=dec2bin(PC,16)-48;
-              img(81:96,iSlice)=dec2bin(nS,16)-48;
-              img(1,iSlice)=dec2bin(channel)-48; % Set the first bit of iSlice to 1 for H particles. When 1's and 0's are reversed, this becomes a 0.
-              iii=iii+n;
-              end
+            if bHTiming~=0 || bVTiming~=0     
+                iii=iii+nH+nV;
+            else
+                jjj=1;
+                kkk=0;
+                while jjj<=nS && kkk<n-2 % Last two slices are time
+                    aa=bitand(buf(iii+kkk),16256)/2^7;  %bin2dec('0011111110000000') - nShaded
+                    bb=bitand(buf(iii+kkk),127); %bin2dec('0000000001111111') - nClear
+                    img(min(128,bb+1):min(aa+bb,128),iSlice+jjj)=1;
+                    bBase=min(aa+bb,128);
+                    kkk=kkk+1;
+                    while(bitand(buf(iii+kkk),16384)==0  && kkk<n-2) % bin2dec('1000000000000000') - start slice flag
+                        aa=bitand(buf(iii+kkk),16256)/2^7;
+                        bb=bitand(buf(iii+kkk),127);
+                        img(min(128,bBase+bb+1):min(bBase+aa+bb,128),iSlice+jjj)=1;
+                        bBase=min(bBase+aa+bb,128);
+                        kkk=kkk+1;
+                    end
+                    jjj=jjj+1;
+                end
+                iSlice=iSlice+nS+2;
+                img(:,iSlice-1)='10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010';
+                img(:,iSlice-1)=img(:,iSlice-1)-48; % Shorthand type conversion from (ASCII) char to double (decimal), dec2bin output is ASCII character
+                img(:,iSlice)=1;
+                %Fix the image TW bits if bad and log
+                tw1 = buf(iii+n-2);
+                tw2 = buf(iii+n-1);
+                if ~isnan(img_last)
+                    if (tw2 - img_last(2)) < 0 && (tw1 - img_last(1)) < 0 &&  HK_last(1) < 2^15% Both timing words decremented w/o last HK packet ready to roll
+                        system(['echo "Img TW: ' num2str(tw2)  ' ' num2str(img_last(2)) ', HK: ' num2str(HK_last(1)) ' ' num2str(HK_last(2)) '" >> output.txt']);
+                        tw1 = HK_last(1);
+                        img_last(1) = tw1;
+                    else
+                        img_last(1) = tw1;
+                        img_last(2) = tw2;
+                    end
+                else
+                    img_last = NaN(1,2);
+                    img_last(1) = tw1;
+                    img_last(2) = tw2;
+                end
+                tParticle=tw1*2^16+tw2;
+                img(:,iSlice)=dec2bin(tParticle,128)-48;% Writes binary timing word information to bits 97:128 before compression to (16-)bits 7:8
+                img(49:64,iSlice)=dec2bin(NWord,16)-48;
+                img(65:80,iSlice)=dec2bin(PC,16)-48;
+                img(81:96,iSlice)=dec2bin(nS,16)-48;
+                img(1,iSlice)=dec2bin(channel)-48; % Set the first bit of iSlice to 1 for H particles. When 1's and 0's are reversed, this becomes a 0.
+                iii=iii+n;
+            end
                     
         elseif 18507==buf(iii) % 'HK' in ascii (housekeeping)
             HKon=1;
@@ -395,8 +414,12 @@ function [img, HK, HKon]=get_img(buf,outfilename2)
             HK.Spare3 = buf(iii-1+49);
             HK.tas = typecast( uint32(bin2dec([dec2bin(buf(iii-1+50),16) dec2bin(buf(iii-1+51),16)])) ,'single');
             tas = HK.tas;
-            HK.time = buf(iii-1+52)*2^16+buf(iii-1+53);
-            
+            tw1 = buf(iii-1+52);% Timing Word 1, bit 52
+            tw2 = buf(iii-1+53);% Timing Word 2, bit 53
+            HK_last(1) = tw1;
+            HK_last(2) = tw2;
+            HK.time = tw1*2^16+tw2;
+
             iii = iii + 53;
         
         elseif 19787==buf(iii) % 'MK' in ascii (Mask data block)

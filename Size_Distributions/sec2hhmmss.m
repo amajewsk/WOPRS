@@ -1,9 +1,9 @@
 function [hhmmss]=sec2hhmmss(seconds)
+%return HHMMSS.MS formatted time from seconds since start of day
+hours = floor(seconds/3.6d3);
+minutes = floor((seconds-hours*3.6d3)/6d1);
+seconds = seconds - (hours*3.6d3) - (minutes*6d1);
 
-hours = floor(seconds/3600);
-minutes = floor((seconds-hours*3600)/60);
-seconds = seconds - (hours*3600) - (minutes*60);
-
-hhmmss = hours*10000 + minutes*100 + seconds;
+hhmmss = hours*1d4 + minutes*1d2 + seconds;
 
 end

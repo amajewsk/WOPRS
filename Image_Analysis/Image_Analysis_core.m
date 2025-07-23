@@ -31,6 +31,13 @@ handles.f = netcdf.open(infile,'nowrite');
 [~, handles.img_count] = netcdf.inqDim(handles.f,0); 
 warning off all
 
+%% Read the HK file
+hk_file = infile % string manipulation / file search
+handles.f = netcdf.open(hk_file)
+tas_hk = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'tas'));
+time_hk = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'time'));
+
+
 %% Define the PROC file
 [f,varid]=define_outfile_Image_Analysis(probetype,outfile,diodesize,diodenum,armdist,wavelength,inter_arrival_threshold);
 
@@ -48,8 +55,8 @@ last_V = -1;
 for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
 
     handles.year     = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'year'    ),i-1,1);
-    handles.month    = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'month'  ),i-1,1);
-    handles.day      = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'day'  ),i-1,1);
+    handles.month    = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'month'   ),i-1,1);
+    handles.day      = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'day'     ),i-1,1);
     handles.hour     = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'hour'    ),i-1,1);
     handles.minute   = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'minute'  ),i-1,1);
     handles.second   = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'second'  ),i-1,1);
@@ -62,9 +69,9 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
     else %CIP
         handles.empty       = netcdf.getVar(handles.f,netcdf.inqVarID(handles.f,'empty'),i-1,1);
     end
-     if mod(i,10000) == 0
+    if mod(i,10000) == 0
         [num2str(i),'/',num2str(handles.img_count)]
-     end
+    end
     
     % Read in the buffers. Buffer sizes vary between the probetypes.
     data_varid = netcdf.inqVarID(handles.f,'data');
@@ -238,14 +245,26 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                 elseif probetype==2 %SPEC
                     
                     PMSoverload_SPECwkday(kk)= handles.wkday;
-                    part_time = double(data(header_loc,7))*2^16+double(data(header_loc,8)); % Interarrival time in tas clock cycles
+                    part_slices = double(data(header_loc,6));% SPEC timing words arrive after the last particle slice, these have to be removed for accuracy
+                    header_time = double(data(header_loc,7))*2^16+double(data(header_loc,8));
+                    part_time = header_time-part_slices; % Particle arrival time in tas clock cycles
+                    
+                    % Fix time dilation/stretching from probe TAS
+                    % disagreements w datasystem TAS
+                    if tas_hk(time_hk == header_time) > 0 %check if good tas data for particle (interp to nearest second)
+                        clockfactor = tas_ac/tas_hk;
+                        tas_kk = tas_hk(time_hk == header_time);
+                    else % set this particle's tas to 100 m/s bc no good tas_hk or tas_ac available 
+                        clockfactor = 1.% reset this for the case of sparse/missing tas data
+                        tas_kk = 100;
+                    end
 
                     part_micro(kk) = part_time;
                     part_mil(kk)   = 0;
                     part_sec(kk)   = 0;
                     part_min(kk)   = 0;
                     part_hour(kk)  = 0;
-                    time_in_seconds(kk) = part_micro(kk)*(diodesize/(10^3)/170);
+                    time_in_seconds(kk) = part_micro(kk)*(diodesize/(10^3)/(tas_hk*clockfactor)); % Convert from clock cycles to seconds by dividing through the along-track pixel resolution and TAS
 
                     %*************************************
                     % If the image is not the first image in the data set,
@@ -269,10 +288,9 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                             end
                             last_V = part_micro(kk);
                     end
-                            
-        
-                    % Fix interarrival times if the time variable gets too
-                    % large for MATLAB, and the times rollover.
+
+                    % Fix interarrival times if the clock cycles rollover
+                    % beyond the 32 bit binary limit from the processor
                     if images.int_arrival(kk) < 0
                         images.int_arrival(kk) = images.int_arrival(kk) +  (2^32 - 1);
                     end
@@ -300,7 +318,6 @@ for i=((n-1)*nEvery+1):min(n*nEvery,handles.img_count)
                     part_micro(kk) = bitget(data(header_loc,47),1)*512+data(header_loc,46)*128+data(header_loc,45)*32+data(header_loc,44)*8+data(header_loc,43)*2+bitshift(data(header_loc,42),-1);
                     part_micro(kk) = part_micro(kk) + 3/8*(bitget(data(header_loc,42),1)*4+data(header_loc,41));
                      
-                    fours = power(4,0:7);
                     fours = power(4,0:3);
                     part_tas = sum(data(header_loc, 29:32).*fours);
                     time_in_seconds(kk) = part_hour(kk) * 3600 + part_min(kk) * 60 + part_sec(kk) + part_mil(kk)/1000 + part_micro(kk)/1e6;
